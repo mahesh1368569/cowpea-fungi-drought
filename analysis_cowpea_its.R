@@ -528,6 +528,40 @@ order_abundance = ggplot(order_long, aes(x = Treatment, y = Abundance, fill = Or
 ggsave("Output/PDFs/abundance_plot_order.pdf", plot = order_abundance, 
        width = 12, height = 6, units = "in", 
        dpi = 1000)
+#-----------------------------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------------
+ # environmental analysis
+
+# add_data is used to add the environmental data
+env_sujan <- trans_env$new(dataset = meco_dataset, add_data = phyis)
+
+# use Genus
+env_sujan$cal_ordination(method = "RDA", taxa_level = "Genus")
+
+# select 10 features and adjust the arrow length
+env_sujan$trans_ordination(show_taxa = 10, adjust_arrow_length = TRUE, max_perc_env = 1.5, max_perc_tax = 1.5, min_perc_env = 0.2, min_perc_tax = 0.2)
+
+# t1$res_rda_trans is the transformed result for plot
+env_sujan$plot_ordination(plot_color = "Treatment")
+env_sujan$cal_ordination_anova()
+
+env_sujan$res_ordination_terms
+env_sujan$res_ordination_axis
+
+#correlation analysis genus with fungi
+
+# 'p_adjust_type = "Env"' means p adjustment is performed for each environmental variable separately.
+env_sujan$cal_cor(use_data = "Genus", p_adjust_method = "fdr", p_adjust_type = "Env")
+
+env_sujan$plot_cor()
+
+# first create trans_diff object as a demonstration
+env_sujan <- trans_diff$new(dataset = meco_dataset, method = "rf", group = "Genotype", taxa_level = "Genus", p_adjust_method = "none")
+
+
+# use other_taxa to select taxa you need
+t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_diff$Taxa[1:40])
+t1$plot_cor()
 
 
 
