@@ -1,0 +1,5 @@
+new("big.matrix.descriptor", description = list(sharedType = "FileBacked", 
+    filename = "pd.bin", dirname = "/Users/durgapurushothammaheshchinthalapudi/Documents/R-Git/cowpea-fungi/pdbig.2511240921/", 
+    totalRows = 94L, totalCols = 94L, rowOffset = c(0, 94), colOffset = c(0, 
+    94), nrow = 94, ncol = 94, rowNames = NULL, colNames = NULL, 
+    type = "double", separated = FALSE))
