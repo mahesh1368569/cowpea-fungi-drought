@@ -147,6 +147,12 @@ genotype_network$ES4 = episelect4_network
 cowpea_network %<>% cal_module(undirected_method = "cluster_fast_greedy")
 genotype_network %<>% cal_module(undirected_method = "cluster_fast_greedy")
 
+#1.2 Network topological attributes for all networks
+
+network_atr = cal_network_attr(cc_ms_network)
+
+write.csv(network_atr, "network_attributes.csv")
+
 #1.2 Network edge properties
 
 cowpea_network %<>% get_node_table(node_roles = TRUE) %>% get_edge_table
@@ -157,6 +163,118 @@ network_atr_trt = cal_network_attr(cowpea_network)
 network_atr_gen = cal_network_attr(genotype_network)
 write.csv(network_atr_trt, "Output/data files/network_attributes_drought.csv")
 write.csv(network_atr_gen, "Output/data files/network_attributes_genotype.csv")
+
+# Node degrees calculation
+degree_trt = node_comp(cowpea_network, property = "degree")
+degree_gen = node_comp(genotype_network, property = "degree")
+
+# Prepare data for plotting
+degree_df_trt <- as.data.frame(degree_trt$otu_table)
+degree_df_gen <- as.data.frame(degree_gen$otu_table)
+
+degree_df_trt$Node <- rownames(degree_df_trt)
+degree_df_gen$Node <- rownames(degree_df_gen)
+
+degree_long_trt <- pivot_longer(degree_df_trt, cols = -Node, names_to = "Network", values_to = "Degree")
+degree_long_gen <- pivot_longer(degree_df_gen, cols = -Node, names_to = "Network", values_to = "Degree")
+
+# Plot boxplots of node degrees
+degree_trt_plot = ggplot(degree_long_trt, aes(x = Network, y = Degree, fill = Network)) +
+  geom_boxplot() +
+  labs(title = "Comparison of Node Degrees",
+       x = "Network",
+       y = "Node Degree") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")  +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5)
+  )
+
+degree_gen_plot = ggplot(degree_long_gen, aes(x = Network, y = Degree, fill = Network)) +
+  geom_boxplot() +
+  labs(title = "Comparison of Node Degrees",
+       x = "Network",
+       y = "Node Degree") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")  +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5)
+  )
+
+ggsave("degree_genotype.pdf", degree_gen_plot, width = 4, height = 4)
+ggsave("degree_treatment.pdf", degree_trt_plot, width = 4, height = 4)
+
+# Example: Wilcoxon test between Nitrogen_0 and Nitrogen_100
+kruskal.test(Degree ~ Network, data = degree_long_gen)
+
+# Betweenness Centrality
+btw_table_trt <- node_comp(cowpea_network, property = "betweenness_centrality")
+btw_table_gen <- node_comp(genotype_network, property = "betweenness_centrality")
+
+# Closeness Centrality
+close_table_trt <- node_comp(cowpea_network, property = "closeness_centrality")
+close_table_gen <- node_comp(genotype_network, property = "closeness_centrality")
+
+# Eigenvector Centrality
+eigen_table_trt <- node_comp(cowpea_network, property = "eigenvector_centrality")
+eigen_table_gen <- node_comp(genotype_network, property = "eigenvector_centrality")
+
+# Convert to data frames and add Node column
+btw_df_trt <- btw_table_trt$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+close_df_trt <- close_table_trt$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+eigen_df_trt <- eigen_table_trt$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+
+btw_df_gen <- btw_table_gen$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+close_df_gen <- close_table_gen$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+eigen_df_gen <- eigen_table_gen$otu_table %>% as.data.frame() %>% tibble::rownames_to_column("Node")
+
+# Add a 'Measure' column to each and pivot longer
+btw_long_trt <- btw_df_trt %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Betweenness")
+close_long_trt <- close_df_trt %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Closeness")
+eigen_long_trt <- eigen_df_trt %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Eigenvector")
+
+btw_long_gen <- btw_df_gen %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Betweenness")
+close_long_gen <- close_df_gen %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Closeness")
+eigen_long_gen <- eigen_df_gen %>% pivot_longer(-Node, names_to = "Network", values_to = "Value") %>% mutate(Measure = "Eigenvector")
+
+# Combine all into one data frame
+centrality_long_trt <- bind_rows(btw_long_trt, close_long_trt, eigen_long_trt)
+centrality_long_gen <- bind_rows(btw_long_gen, close_long_gen, eigen_long_gen)
+
+library(ggpubr)
+
+centrality_trt = ggplot(centrality_long_trt, aes(x = Network, y = Value, fill = Network)) +
+  geom_boxplot() +
+  facet_wrap(~ Measure, scales = "free_y") +
+  labs(title = "Centrality Measures Across Networks",
+       y = "Centrality Value",
+       x = "Network") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5),
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 12)
+  ) +
+  stat_compare_means(method = "kruskal.test", label = "p.format")
+
+centrality_gen = ggplot(centrality_long_gen, aes(x = Network, y = Value, fill = Network)) +
+  geom_boxplot() +
+  facet_wrap(~ Measure, scales = "free_y") +
+  labs(title = "Centrality Measures Across Networks",
+       y = "Centrality Value",
+       x = "Network") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5),
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 12)
+  ) +
+  stat_compare_means(method = "kruskal.test", label = "p.format")
+
+centrality_gen
+
+ggsave("centrality_gen.pdf", centrality_gen, width = 6, height = 6)
+ggsave("centrality_trt.pdf", centrality_trt, width = 6, height = 6)
 
 #1.4 Network plotting #
 
@@ -226,34 +344,74 @@ g2 = pheatmap::pheatmap(cowpea_gen_edgetax, display_numbers = T)
 ggsave("Output/PDFs/trt_pheatmap.pdf", g1, height = 7, width = 7, dpi = 1000)
 ggsave("Output/PDFs/gen_pheatmap.pdf", g2, height = 7, width = 7, dpi = 1000)
 
-#---------------------------------------------------------------------------------------------------------------------------------------------------
-# 1.7 Module eigengene analysis
-# In microbial co-occurence networks, modules (or clusters) are groups of closely connected taxa (nodes). A module eigengene is the
-# first principal component (PC1) of the relative abundances of all the taxa (ASVs/OTUs) in that module.
-#---------------------------------------------------------------------------------------------------------------------------------------------------
 
-tmp <- "cowpea_module_eigen"
-dir.create(tmp)
+#1.10 Robustness
 
-for(i in names(cowpea_network)){
-  
-  # module eigengene analysis
-  cowpea_network[[i]]$cal_eigen()
-  
-  # create trans_env object to perform correlations
-  tmp1 <- clone(meco_dataset)
-  tmp1$sample_table %<>% base::subset(Treatment == i)
-  tmp1$tidy_dataset()
-  
-  # select abiotic factors in sample_table of tmp1
-  tmp2 <- trans_env$new(dataset = tmp1, add_data = phyis)
-  tmp2$cal_cor(add_abund_table = cowpea_network[[i]]$res_eigen)
-  
-  g1 <- tmp2$plot_cor()
-  ggsave(paste0(tmp, "/", i, ".pdf"), g1, width = 7, height = 5)
-}
+?robustness
+
+robustness_trt <- robustness$new(cowpea_network, remove_strategy = c("edge_rand", "edge_strong", "node_rand", "node_degree_high"), 
+                                remove_ratio = seq(0, 0.99, 0.1), measure = c("Eff", "Eigen", "Pcr"), run = 10)
+robustness_gen <- robustness$new(genotype_network, remove_strategy = c("edge_rand", "edge_strong", "node_rand", "node_degree_high"), 
+                                 remove_ratio = seq(0, 0.99, 0.1), measure = c("Eff", "Eigen", "Pcr"), run = 10)
+
+plotrob_trt = robustness_trt$plot(linewidth = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 16), # Increase x-axis text size
+        axis.text.y = element_text(size = 16), # Increase y-axis text size
+        axis.title.x = element_text(size = 16), # Increase x-axis label size
+        axis.title.y = element_text(size = 16), # Increase y-axis label size
+        strip.text = element_text(size = 16),
+        legend.position = "right",
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 16),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+plotrob_gen = robustness_gen$plot(linewidth = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 16), # Increase x-axis text size
+        axis.text.y = element_text(size = 16), # Increase y-axis text size
+        axis.title.x = element_text(size = 16), # Increase x-axis label size
+        axis.title.y = element_text(size = 16), # Increase y-axis label size
+        strip.text = element_text(size = 16),
+        legend.position = "right",
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 16),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+ggsave("plot_robustness_trt.pdf", plotrob_trt, width = 14, height = 10)
+ggsave("plot_robustness_gen.pdf", plotrob_gen, width = 14, height = 10)
 
 
+#1.11 Vulnerability of nodes
+
+vul_table_trt <- vulnerability(cowpea_network)
+vul_table_gen <- vulnerability(genotype_network)
+
+vulnerability_trt = ggplot(data = vul_table_trt, aes(x = Network, y = vulnerability, fill = Network)) +
+  geom_boxplot() +  # Faceting by measure on rows
+  labs(title = "Boxplot of Network Vulnerability",
+       x = "Network",
+       y = "Vulnerability") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5)
+  ) # Using a different palette for better distinction between Network types
+
+vulnerability_gen = ggplot(data = vul_table_gen, aes(x = Network, y = vulnerability, fill = Network)) +
+  geom_boxplot() +  # Faceting by measure on rows
+  labs(title = "Boxplot of Network Vulnerability",
+       x = "Network",
+       y = "Vulnerability") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1.5)
+  ) # Using a different palette for better distinction between Network types
+
+
+ggsave("vulnerability_trt.pdf", vulnerability_trt, width = 5, height = 6)
+ggsave("vulnerability_gen.pdf", vulnerability_gen, width = 5, height = 6)
 
 
 
